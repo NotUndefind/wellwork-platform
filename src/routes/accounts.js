@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Inscription d'un salarie.
 router.post('/register', (req, res) => {
-  const { email, password, firstName, lastName, company, birthDate } = req.body || {};
+  const { email, password, firstName, lastName, company, birthDate, marketingOptIn, thirdParty } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
   log('info', 'register_attempt', { email, company });
@@ -24,12 +24,12 @@ router.post('/register', (req, res) => {
     firstName, lastName, company,
     birthDate,
     role: 'employee',
-    marketingOptIn: true,
+    marketingOptIn: marketingOptIn === true,
     createdAt: new Date().toISOString(),
     deleted: false,
   };
   db.insert('users', user);
-  db.insert('consents', { id: db.nextId('consents'), userId: user.id, marketing: true, thirdParty: true, at: user.createdAt });
+  db.insert('consents', { id: db.nextId('consents'), userId: user.id, marketing: marketingOptIn === true, thirdParty: thirdParty === true, at: user.createdAt });
   const token = issueToken(user);
   res.status(201).json({ token, user });
 });

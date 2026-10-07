@@ -62,4 +62,28 @@ test('mot de passe non visible dans les logs', async () => {
   });
 });
 
+test('consentements non pre-coches a l inscription', async () => {
+  await withServer(async (b) => {
+    // 1. Inscription SANS aucun choix de consentement -> tout doit etre false.
+    const r = await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'consent-off@b.example', password: 'x' }) });
+    assert.equal(r.status, 201);
+    const { user } = await r.json();
+    assert.equal(user.marketingOptIn, false);
+
+    const data = JSON.parse(fs.readFileSync(process.env.DB_FILE, 'utf8'));
+    const consent = data.consents.find((c) => c.userId === user.id);
+    assert.ok(consent, 'un enregistrement de consentement doit exister');
+    assert.equal(consent.marketing, false);
+    assert.equal(consent.thirdParty, false);
+
+    // 2. Inscription AVEC choix explicite -> le consentement reste possible.
+    const r2 = await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'consent-on@b.example', password: 'x', marketingOptIn: true, thirdParty: true }) });
+    const { user: user2 } = await r2.json();
+    const data2 = JSON.parse(fs.readFileSync(process.env.DB_FILE, 'utf8'));
+    const consent2 = data2.consents.find((c) => c.userId === user2.id);
+    assert.equal(consent2.marketing, true);
+    assert.equal(consent2.thirdParty, true);
+  });
+});
+
 test.after(() => { for (const f of [process.env.DB_FILE]) try { fs.unlinkSync(f); } catch { /* ok */ } });
