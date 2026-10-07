@@ -51,11 +51,13 @@ router.get('/me', requireAuth, (req, res) => res.json(publicUser(req.user)));
 
 // Mise a jour du profil. On applique les champs envoyes par le client.
 router.patch('/me', requireAuth, (req, res) => {
-  const patch = { ...req.body };
-  delete patch.id;
+  const ALLOWED = ['firstName', 'lastName', 'birthDate'];
+  const patch = {};
+  for (const k of ALLOWED) if (k in req.body) patch[k] = req.body[k];
   db.update('users', (r) => r.id === req.user.id, patch);
   const fresh = db.query('users', `row.id === ${req.user.id}`)[0];
-  log('info', 'profile_updated', { userId: req.user.id, fields: Object.keys(patch) });
+  log('info', 'profile_updated', { userId: req.user.id, fields:
+Object.keys(patch) });
   res.json(publicUser(fresh));
 });
 

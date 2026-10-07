@@ -118,4 +118,20 @@ test('passwordHash absent des reponses de l API', async () => {
   });
 });
 
+test('mass assignment impossible sur PATCH /me', async () => {
+  await withServer(async (b) => {
+    const reg = await j(await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'patch@b.example', password: 'x', firstName: 'Avant' }) }));
+    const auth = { authorization: `Bearer ${reg.token}`, 'content-type': 'application/json' };
+
+    // Tentative d'elevation de privilege + modif d'un champ legitime dans la meme requete.
+    const patched = await j(await fetch(`${b}/api/me`, { method: 'PATCH', headers: auth, body: JSON.stringify({ role: 'admin', firstName: 'Apres' }) }));
+    assert.equal(patched.role, 'employee'); // le role ne doit PAS avoir change
+    assert.equal(patched.firstName, 'Apres'); // mais le champ autorise est bien applique
+
+    // Confirmation apres relecture du profil.
+    const me = await j(await fetch(`${b}/api/me`, { headers: { authorization: `Bearer ${reg.token}` } }));
+    assert.equal(me.role, 'employee');
+  });
+});
+
 test.after(() => { for (const f of [process.env.DB_FILE]) try { fs.unlinkSync(f); } catch { /* ok */ } });
