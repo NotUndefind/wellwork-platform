@@ -154,4 +154,25 @@ test('export assureur minimise : sans passwordHash ni comptes supprimes', async 
   });
 });
 
+test('IDOR : un salarie ne peut pas lire la fiche d un autre', async () => {
+  await withServer(async (b) => {
+    const a = await j(await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'idor-a@b.example', password: 'x' }) }));
+    const autre = await j(await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'idor-b@b.example', password: 'x' }) }));
+    const authA = { authorization: `Bearer ${a.token}` };
+
+    // A -> fiche d'un autre salarie : interdit
+    const cross = await fetch(`${b}/api/users/${autre.user.id}`, { headers: authA });
+    assert.equal(cross.status, 403);
+
+    // A -> sa propre fiche : autorise
+    const self = await fetch(`${b}/api/users/${a.user.id}`, { headers: authA });
+    assert.equal(self.status, 200);
+
+    // Un compte privilegie (admin/rh) garde l'acces a toute fiche
+    const admin = db.insert('users', { id: db.nextId('users'), email: 'idor-admin@b.example', passwordHash: db.hashPassword('x'), role: 'admin', deleted: false });
+    const asAdmin = await fetch(`${b}/api/users/${autre.user.id}`, { headers: { authorization: `Bearer ${issueToken(admin)}` } });
+    assert.equal(asAdmin.status, 200);
+  });
+});
+
 test.after(() => { for (const f of [process.env.DB_FILE]) try { fs.unlinkSync(f); } catch { /* ok */ } });

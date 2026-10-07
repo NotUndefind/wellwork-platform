@@ -22,9 +22,14 @@ router.post('/questionnaires', requireAuth, (req, res) => {
 
 // Consultation d'un utilisateur par identifiant.
 router.get('/users/:id', requireAuth, (req, res) => {
-  const u = db.query('users', `row.id === ${Number(req.params.id)}`)[0];
+  const id = Number(req.params.id);
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'rh';
+  if (req.user.id !== id && !isPrivileged) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  const u = db.query('users', `row.id === ${id}`)[0];
   if (!u) return res.status(404).json({ error: 'not found' });
-  const questionnaires = db.query('questionnaires', `row.userId === ${Number(req.params.id)}`);
+  const questionnaires = db.query('questionnaires', `row.userId === ${id}`);
   res.json({ ...publicUser(u), questionnaires });
 });
 
