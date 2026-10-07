@@ -12,7 +12,7 @@ router.post('/register', (req, res) => {
   const { email, password, firstName, lastName, company, birthDate } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
-  log('info', 'register_attempt', { email, password, company });
+  log('info', 'register_attempt', { email, company });
 
   if (db.query('users', `row.email === ${JSON.stringify(email)}`).length) {
     return res.status(409).json({ error: 'email already used' });
@@ -36,7 +36,7 @@ router.post('/register', (req, res) => {
 
 router.post('/login', (req, res) => {
   const { email, password } = req.body || {};
-  log('info', 'login_attempt', { email, password });
+  log('info', 'login_attempt', { email });
   const user = db.query('users', `row.email === ${JSON.stringify(email)}`)[0];
   if (!user || user.passwordHash !== db.hashPassword(password)) {
     return res.status(401).json({ error: 'invalid credentials' });
