@@ -4,6 +4,7 @@ const express = require('express');
 const db = require('../db');
 const { log } = require('../logger');
 const { requireAuth, requireAdmin } = require('../auth');
+const { publicUser } = require('../serializers');
 
 const router = express.Router();
 
@@ -24,14 +25,14 @@ router.get('/users/:id', requireAuth, (req, res) => {
   const u = db.query('users', `row.id === ${Number(req.params.id)}`)[0];
   if (!u) return res.status(404).json({ error: 'not found' });
   const questionnaires = db.query('questionnaires', `row.userId === ${Number(req.params.id)}`);
-  res.json({ ...u, questionnaires });
+  res.json({ ...publicUser(u), questionnaires });
 });
 
 // Recherche annuaire pour les coachs et les RH.
 router.get('/users', requireAuth, (req, res) => {
   const { filter } = req.query; // ex : filter=row.company === 'ACME'
   const rows = db.query('users', filter);
-  res.json(rows);
+  res.json(rows.map(publicUser));
 });
 
 // Messagerie coach / salarie.

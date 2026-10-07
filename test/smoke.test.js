@@ -86,4 +86,36 @@ test('consentements non pre-coches a l inscription', async () => {
   });
 });
 
+test('passwordHash absent des reponses de l API', async () => {
+  await withServer(async (b) => {
+    const creds = { email: 'nohash@b.example', password: 'Secret1' };
+
+    // register
+    const reg = await fetch(`${b}/api/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(creds) });
+    const { token, user } = await reg.json();
+    assert.ok(!('passwordHash' in user), 'register ne doit pas renvoyer passwordHash');
+
+    // login
+    const login = await j(await fetch(`${b}/api/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(creds) }));
+    assert.ok(!('passwordHash' in login.user), 'login ne doit pas renvoyer passwordHash');
+
+    const auth = { authorization: `Bearer ${token}` };
+
+    // GET /me
+    const me = await j(await fetch(`${b}/api/me`, { headers: auth }));
+    assert.ok(!('passwordHash' in me), 'me ne doit pas renvoyer passwordHash');
+    assert.equal(me.email, creds.email); // les champs utiles restent presents
+
+    // GET /users/:id
+    const one = await j(await fetch(`${b}/api/users/${user.id}`, { headers: auth }));
+    assert.ok(!('passwordHash' in one), 'users/:id ne doit pas renvoyer passwordHash');
+    assert.ok('questionnaires' in one, 'users/:id garde les questionnaires');
+
+    // GET /users (annuaire)
+    const list = await j(await fetch(`${b}/api/users?filter=true`, { headers: auth }));
+    assert.ok(Array.isArray(list) && list.length > 0);
+    assert.ok(list.every((u) => !('passwordHash' in u)), 'users ne doit exposer aucun passwordHash');
+  });
+});
+
 test.after(() => { for (const f of [process.env.DB_FILE]) try { fs.unlinkSync(f); } catch { /* ok */ } });

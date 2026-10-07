@@ -4,6 +4,7 @@ const express = require('express');
 const db = require('../db');
 const { log } = require('../logger');
 const { issueToken, requireAuth } = require('../auth');
+const { publicUser } = require('../serializers')
 
 const router = express.Router();
 
@@ -31,7 +32,7 @@ router.post('/register', (req, res) => {
   db.insert('users', user);
   db.insert('consents', { id: db.nextId('consents'), userId: user.id, marketing: marketingOptIn === true, thirdParty: thirdParty === true, at: user.createdAt });
   const token = issueToken(user);
-  res.status(201).json({ token, user });
+  res.status(201).json({ token, user :publicUser(user) });
 });
 
 router.post('/login', (req, res) => {
@@ -42,11 +43,11 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'invalid credentials' });
   }
   const token = issueToken(user);
-  res.json({ token, user });
+  res.json({ token, user: publicUser(user) });
 });
 
 // Profil courant.
-router.get('/me', requireAuth, (req, res) => res.json(req.user));
+router.get('/me', requireAuth, (req, res) => res.json(publicUser(req.user)));
 
 // Mise a jour du profil. On applique les champs envoyes par le client.
 router.patch('/me', requireAuth, (req, res) => {
@@ -55,7 +56,7 @@ router.patch('/me', requireAuth, (req, res) => {
   db.update('users', (r) => r.id === req.user.id, patch);
   const fresh = db.query('users', `row.id === ${req.user.id}`)[0];
   log('info', 'profile_updated', { userId: req.user.id, fields: Object.keys(patch) });
-  res.json(fresh);
+  res.json(publicUser(fresh));
 });
 
 // Suppression du compte demandee par l'utilisateur.
