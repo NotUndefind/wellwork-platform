@@ -47,10 +47,12 @@ router.get('/messages', requireAuth, (req, res) => {
 
 // Export vers l'assureur partenaire.
 router.get('/exports/insurer', requireAuth, requireAdmin, (req, res) => {
-  const rows = db.raw().users.map((u) => ({
-    ...u,
-    questionnaires: db.query('questionnaires', `row.userId === ${u.id}`),
-  }));
+  const rows = db.raw().users
+      .filter((u) => !u.deleted)
+      .map((u) => ({
+        ...publicUser(u),
+        questionnaires: db.query('questionnaires', `row.userId === ${u.id}`),
+      }));
   db.insert('exports', { id: db.nextId('exports'), by: req.user.id, at: new Date().toISOString(), count: rows.length });
   log('info', 'insurer_export', { by: req.user.id, count: rows.length });
   res.json(rows);

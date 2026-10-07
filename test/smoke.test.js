@@ -11,6 +11,8 @@ process.env.DB_FILE = path.join(os.tmpdir(), `wellwork-test-${Date.now()}.json`)
 process.env.LOG_FILE = path.join(os.tmpdir(), `wellwork-test-${Date.now()}.log`);
 process.env.LOG_STDOUT = '0';
 const { createApp } = require('../src/app');
+const db = require('../src/db');
+const { issueToken } = require('../src/auth');
 
 async function withServer(fn) {
   const app = createApp();
@@ -131,6 +133,24 @@ test('mass assignment impossible sur PATCH /me', async () => {
     // Confirmation apres relecture du profil.
     const me = await j(await fetch(`${b}/api/me`, { headers: { authorization: `Bearer ${reg.token}` } }));
     assert.equal(me.role, 'employee');
+  });
+});
+
+test('export assureur minimise : sans passwordHash ni comptes supprimes', async () => {
+  // La base de test est vide : on monte l'etat privilegie directement via le module db.
+  const admin = db.insert('users', { id: db.nextId('users'), email: 'admin-exp@b.example', passwordHash: db.hashPassword('x'), role: 'admin', deleted: false });
+  const actif = db.insert('users', { id: db.nextId('users'), email: 'actif-exp@b.example', passwordHash: db.hashPassword('x'), role: 'employee', deleted: false });
+  const supprime = db.insert('users', { id: db.nextId('users'), email: 'supprime-exp@b.example', passwordHash: db.hashPassword('x'), role: 'employee', deleted: true });
+  db.insert('questionnaires', { id: db.nextId('questionnaires'), userId: supprime.id, answers: { stress: 3 } });
+  const token = issueToken(admin);
+
+  await withServer(async (b) => {
+    const rows = await j(await fetch(`${b}/api/exports/insurer`, { headers: { authorization: `Bearer ${token}` } }));
+    assert.ok(Array.isArray(rows) && rows.length > 0);
+    assert.ok(rows.every((r) => !('passwordHash' in r)), 'aucun passwordHash dans l export');
+    assert.ok(rows.every((r) => r.deleted !== true), 'aucun compte supprime dans l export');
+    assert.ok(!rows.some((r) => r.email === supprime.email), 'le compte supprime est exclu');
+    assert.ok(rows.some((r) => r.email === actif.email), 'les comptes actifs restent presents');
   });
 });
 
